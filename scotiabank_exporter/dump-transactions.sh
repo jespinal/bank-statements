@@ -26,9 +26,9 @@ echo "== Fetching transactions for credit card ID: ${CREDITCARD_ID} from ${FROM_
 TRANSACTIONS=$(http GET "${ENDPOINT_URL}/${CREDITCARD_ID}/transactions?from_date=${FROM_DATE}&to_date=${TO_DATE}&status=SETTLED&all=true" Cookie:"${COOKIE}");
 
 echo " - Generating ${TRANSACTIONS_DUMP} file.";
-printf "%s" ${TRANSACTIONS} | jq -rc '.data.records[]' > ./reports/${TRANSACTIONS_DUMP};
+printf "%s" ${TRANSACTIONS} | jq -rc '.data.records[]' > ${TRANSACTIONS_DUMP};
 
-for JSON_ENTRY in $(cat ./reports/${TRANSACTIONS_DUMP}); do
+for JSON_ENTRY in $(cat ${TRANSACTIONS_DUMP}); do
     TXN_ID=$(printf "%s" ${JSON_ENTRY} | jq -rc '.id');
     TXN_TYPE=$(printf "%s" ${JSON_ENTRY} | jq -rc '.transactionType');
 
@@ -59,7 +59,7 @@ for JSON_ENTRY in $(cat ./reports/${TRANSACTIONS_DUMP}); do
     fi
 
     echo " > Found transaction ID ${TXN_ID} of type ${TXN_TYPE} on date ${TXN_DATE}."
-    cat <<REPORT_CONTENT >> ./reports/${DST_FILE}
+    cat <<REPORT_CONTENT >> ${DST_FILE}
 ${TXN_ID};${POSTING_DATE};${TXN_DATE};${TXN_TYPE};${DESCRIPTION};${AMOUNT};${MERCHANT_NAME}
 REPORT_CONTENT
 done

@@ -10,9 +10,9 @@ TO_DATE="2023-04-24"
 
 # There's really no reason to modify these lines unless you know exactly what
 # you are doing
-TRANSACTIONS_DUMP="transactions-${FROM_DATE}-to-${TO_DATE}_${UNIQUE_ID}.json"
-DOP_REPORT="transactions-DOP-report-${FROM_DATE}-to-${TO_DATE}_${UNIQUE_ID}.csv"
-USD_REPORT="transactions-USD-report-${FROM_DATE}-to-${TO_DATE}_${UNIQUE_ID}.csv"
+TRANSACTIONS_DUMP="./reports/transactions-${FROM_DATE}-to-${TO_DATE}_${UNIQUE_ID}.json"
+DOP_REPORT="./reports/transactions-DOP-report-${FROM_DATE}-to-${TO_DATE}_${UNIQUE_ID}.csv"
+USD_REPORT="./reports/transactions-USD-report-${FROM_DATE}-to-${TO_DATE}_${UNIQUE_ID}.csv"
 
 read -r -d '' COOKIE <<COOKIE_CONTENT
 # cookie content goes here
