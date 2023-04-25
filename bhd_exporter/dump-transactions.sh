@@ -63,11 +63,11 @@ while [ ${PAGINA} = "S" ]; do
 
     if [ ${PAGE} -eq 1 ]; then
         PAYLOAD=$(\
-            http GET "${ENDPOINT_URL}?page=${PAGE}&pageSize=${PAGE_SIZE}&startDate=${START_DATE}&endDate=${END_DATE}&productNumber=${PRODUCT_NUMBER}&productType=TC&lastRecord=0&refresh=Y" Cookie:"${COOKIE}"
+            http GET "${ENDPOINT_URL}?page=${PAGE}&pageSize=${PAGE_SIZE}&startDate=${START_DATE}&endDate=${END_DATE}&productNumber=${PRODUCT_NUMBER}&productType=${PRODUCT_TYPE}&lastRecord=0&refresh=Y" Cookie:"${COOKIE}"
         );
     else
         PAYLOAD=$(\
-            http GET "${ENDPOINT_URL}?page=${PAGE}&pageSize=${PAGE_SIZE}&startDate=${START_DATE}&endDate=${END_DATE}&productNumber=${PRODUCT_NUMBER}&productType=TC&lastRecord=0&refresh=N&claveFin=${CLAVE_FIN}&claveInicio=${CLAVE_INICIO}&pantallaPag=${PANTALLA_PAG}&pagina=${PAGINA}" Cookie:"${COOKIE}"
+            http GET "${ENDPOINT_URL}?page=${PAGE}&pageSize=${PAGE_SIZE}&startDate=${START_DATE}&endDate=${END_DATE}&productNumber=${PRODUCT_NUMBER}&productType=${PRODUCT_TYPE}&lastRecord=0&refresh=N&claveFin=${CLAVE_FIN}&claveInicio=${CLAVE_INICIO}&pantallaPag=${PANTALLA_PAG}&pagina=${PAGINA}" Cookie:"${COOKIE}"
         );
     fi
 
@@ -89,6 +89,7 @@ while [ ${PAGINA} = "S" ]; do
     sleep 2;
 done
 
+
 echo
 echo " - Processing ${TRANSACTIONS_DUMP} file.";
 
@@ -97,23 +98,22 @@ for JSON_ENTRY in $(cat ${TRANSACTIONS_DUMP}); do
     TXN_TYPE="";
 
     # This is already in MM/DD/YYYY format.
-    TXN_DATE=$(printf "%s" ${JSON_ENTRY} | jq -rc '.BillingDate');
+    TXN_DATE=$(printf "%s" ${JSON_ENTRY} | jq -rc '.Date' | awk -F"/" '{ print $2"/"$1"/"$3 }');
     TXN_DATE=$(date --date="${TXN_DATE}" +%D);
 
     # This comes in DD/MM/YYYY format. Needs parsing.
-    POSTING_DATE=$(printf "%s" ${JSON_ENTRY} | jq -rc '.ApplicationDate' | awk -F"/" '{ print $2"/"$1"/"$3 }');
-    POSTING_DATE=$(date --date="${POSTING_DATE}" +%D);
+    POSTING_DATE="00/00/00";
 
-    DESCRIPTION=$(printf "%s" ${JSON_ENTRY} | jq -rc '.Description');
+    DESCRIPTION=$(printf "%s" ${JSON_ENTRY} | jq -rc '.Description' | tr -s ' ');
 
-    DEBIT_AMOUNT=$(printf "%s" ${JSON_ENTRY} | jq -rc '.Debit');
-    CREDIT_AMOUNT=$(printf "%s" ${JSON_ENTRY} | jq -rc '.Credit');
+    DEBIT_AMOUNT=$(printf "%s" ${JSON_ENTRY} | jq -rc '.Debit' | tr -d ' ');
+    CREDIT_AMOUNT=$(printf "%s" ${JSON_ENTRY} | jq -rc '.Credit' | tr -d ' ');
 
     CURRENCY=$(printf "%s" ${JSON_ENTRY} | jq -rc '.ProductCurrency');
 
     MERCHANT_NAME="";
 
-    if [ ${CREDIT_AMOUNT} != 'null' ]; then
+    if [[ "${CREDIT_AMOUNT}" != 'null'  && ! -z "${CREDIT_AMOUNT}" ]]; then
         AMOUNT=${CREDIT_AMOUNT};
         IS_CREDIT=1;
     else
@@ -133,8 +133,12 @@ for JSON_ENTRY in $(cat ${TRANSACTIONS_DUMP}); do
         DST_FILE=${USD_REPORT};
     fi
 
+    if [ -z "${TXN_ID}" ]; then
+        TXN_ID="AG-`date +%s`";
+    fi
+
     echo " > Found transaction ID ${TXN_ID} of type ${TXN_TYPE} on date ${TXN_DATE}."
     cat <<REPORT_CONTENT >> ${DST_FILE}
-${TXN_ID:-0000};${POSTING_DATE};${TXN_DATE};${TXN_TYPE};${DESCRIPTION};${AMOUNT};${MERCHANT_NAME}
+${TXN_ID};${POSTING_DATE};${TXN_DATE};${TXN_TYPE};${DESCRIPTION};${AMOUNT};${MERCHANT_NAME}
 REPORT_CONTENT
 done
