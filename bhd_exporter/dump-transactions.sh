@@ -43,6 +43,28 @@ function URLEncode {
     done
 }
 
+# ==============================================================================
+# CREDIT CARD DETAILS
+# ==============================================================================
+if [ "${PRODUCT_TYPE}" = "TC" ]; then
+    DETAILS_ENDPOINT=${TC_DETAILS_ENDPOINT_URL};
+else
+    DETAILS_ENDPOINT=${CA_DETAILS_ENDPOINT_URL};
+fi
+
+PRODUCT_DETAILS=$(\
+    http GET "${DETAILS_ENDPOINT}?productNumber=${PRODUCT_NUMBER}" Cookie:"${COOKIE}"| jq -rc '.data'
+);
+
+TC_BALANCE_DOP=$(printf '%s' "${PRODUCT_DETAILS}" | jq -rc '.CurrentBalanceRD');
+TC_BALANCE_USD=$(printf '%s' "${PRODUCT_DETAILS}" | jq -rc '.CurrentBalanceUS');
+CA_BALANCE=$(printf '%s' "${PRODUCT_DETAILS}" | jq -rc '.CurrentBalance');
+
+printf '%s' "${PRODUCT_DETAILS}" >> ${DETAILS_DUMP};
+
+# ==============================================================================
+# CREDIT CARD TRANSACTIONS
+# ==============================================================================
 START_DATE=$(URLEncode "${START_DATE}");
 END_DATE=$(URLEncode "${END_DATE}");
 PAGE=${PAGE:-1};
@@ -58,16 +80,16 @@ PAGINA="S";
 echo " - Generating ${TRANSACTIONS_DUMP} file.";
 
 # For this provider, transactions should be fetched in a paginated fashion.
-while [ ${PAGINA} = "S" ]; do
+while [ "${PAGINA}" = "S" ]; do
     echo " - Feching page num. ${PAGE}.";
 
     if [ ${PAGE} -eq 1 ]; then
         PAYLOAD=$(\
-            http GET "${ENDPOINT_URL}?page=${PAGE}&pageSize=${PAGE_SIZE}&startDate=${START_DATE}&endDate=${END_DATE}&productNumber=${PRODUCT_NUMBER}&productType=${PRODUCT_TYPE}&lastRecord=0&refresh=Y" Cookie:"${COOKIE}"
+            http GET "${TRANSACTIONS_ENDPOINT_URL}?page=${PAGE}&pageSize=${PAGE_SIZE}&startDate=${START_DATE}&endDate=${END_DATE}&productNumber=${PRODUCT_NUMBER}&productType=${PRODUCT_TYPE}&lastRecord=0&refresh=Y" Cookie:"${COOKIE}"
         );
     else
         PAYLOAD=$(\
-            http GET "${ENDPOINT_URL}?page=${PAGE}&pageSize=${PAGE_SIZE}&startDate=${START_DATE}&endDate=${END_DATE}&productNumber=${PRODUCT_NUMBER}&productType=${PRODUCT_TYPE}&lastRecord=0&refresh=N&claveFin=${CLAVE_FIN}&claveInicio=${CLAVE_INICIO}&pantallaPag=${PANTALLA_PAG}&pagina=${PAGINA}" Cookie:"${COOKIE}"
+            http GET "${TRANSACTIONS_ENDPOINT_URL}?page=${PAGE}&pageSize=${PAGE_SIZE}&startDate=${START_DATE}&endDate=${END_DATE}&productNumber=${PRODUCT_NUMBER}&productType=${PRODUCT_TYPE}&lastRecord=0&refresh=N&claveFin=${CLAVE_FIN}&claveInicio=${CLAVE_INICIO}&pantallaPag=${PANTALLA_PAG}&pagina=${PAGINA}" Cookie:"${COOKIE}"
         );
     fi
 
@@ -93,7 +115,7 @@ done
 echo
 echo " - Processing ${TRANSACTIONS_DUMP} file.";
 
-for JSON_ENTRY in $(cat ${TRANSACTIONS_DUMP}); do
+for JSON_ENTRY in $(cat ${TRANSACTIONS_DUMP} | sed -e 's/}{/}\n{/g'); do
     TXN_ID=$(printf "%s" ${JSON_ENTRY} | jq -rc '.Voucher' | tr -d ' ');
     TXN_TYPE="";
 
@@ -127,6 +149,16 @@ for JSON_ENTRY in $(cat ${TRANSACTIONS_DUMP}); do
         TXN_TYPE="EXPENSE";
     fi
 
+    if [ "${PRODUCT_TYPE}" = "TC" ]; then
+        if [ "${CURRENCY}" = 'RD$' ]; then
+            BALANCE=${TC_BALANCE_DOP};
+        else
+            BALANCE=${TC_BALANCE_USD};
+        fi
+    else
+        BALANCE=${CA_BALANCE}
+    fi
+
     if [ "${CURRENCY}" = 'RD$' ]; then
         DST_FILE=${DOP_REPORT};
     else
@@ -139,6 +171,6 @@ for JSON_ENTRY in $(cat ${TRANSACTIONS_DUMP}); do
 
     echo " > Found transaction ID ${TXN_ID} of type ${TXN_TYPE} on date ${TXN_DATE}."
     cat <<REPORT_CONTENT >> ${DST_FILE}
-${TXN_ID};${POSTING_DATE};${TXN_DATE};${TXN_TYPE};${DESCRIPTION};${AMOUNT};${MERCHANT_NAME}
+${TXN_ID};${POSTING_DATE};${TXN_DATE};${TXN_TYPE};${DESCRIPTION};${AMOUNT};${MERCHANT_NAME};${BALANCE}
 REPORT_CONTENT
 done

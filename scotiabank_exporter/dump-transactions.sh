@@ -28,7 +28,7 @@ TRANSACTIONS=$(http GET "${ENDPOINT_URL}/${CREDITCARD_ID}/transactions?from_date
 echo " - Generating ${TRANSACTIONS_DUMP} file.";
 printf "%s" ${TRANSACTIONS} | jq -rc '.data.records[]' > ${TRANSACTIONS_DUMP};
 
-for JSON_ENTRY in $(cat ${TRANSACTIONS_DUMP}); do
+for JSON_ENTRY in $(cat ${TRANSACTIONS_DUMP} | sed -e 's/}{/}\n{/g'); do
     TXN_ID=$(printf "%s" ${JSON_ENTRY} | jq -rc '.id');
     TXN_TYPE=$(printf "%s" ${JSON_ENTRY} | jq -rc '.transactionType');
 
